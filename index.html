@@ -62,6 +62,8 @@
   button[disabled]{ opacity:0.4; cursor:not-allowed; }
   .spacer{ flex:1 1 auto; min-width:8px; }
   .ghost{ background:transparent; }
+  #record.rec{ border-color:#c0554e; color:#e2837c; }
+  #record.rec::before{ content:""; display:inline-block; width:8px; height:8px; border-radius:50%; background:#d05a52; margin-right:8px; vertical-align:middle; animation:pulse 1.6s ease-out infinite; }
   .seg{ display:inline-flex; border:1px solid var(--line); border-radius:999px; overflow:hidden; }
   .seg button{ border:0; border-radius:0; background:transparent; color:var(--mute); padding:10px 16px; font-size:0.82rem; }
   .seg button[aria-pressed="true"]{ background:var(--panel); color:var(--bone); box-shadow:inset 0 0 0 1px #3a4644; }
@@ -115,6 +117,7 @@
       </div>
       <span class="spacer"></span>
       <button class="ghost" id="clear">Clear water</button>
+      <button class="ghost" id="record">Record</button>
       <button class="ghost" id="save">Save frame</button>
     </div>
 
@@ -140,7 +143,7 @@
 
   // ---------- fluid grid (stable fluids) ----------
   var N=150, M=100, gridCanvas=document.createElement('canvas'), GC=gridCanvas.getContext('2d'), imgData=null;
-  var u,v,u0,v0,pf,divf,curlf, dye, dye0, stain, scratch, IXo=0;
+  var u,v,u0,v0,pf,divf,curlf, dye, dye0, stain, IXo=0;
   function IX(i,j){ return i+j*N; }
   function alloc(){
     var s=N*M;
@@ -149,7 +152,6 @@
     dye=[new Float32Array(s),new Float32Array(s),new Float32Array(s)];
     dye0=[new Float32Array(s),new Float32Array(s),new Float32Array(s)];
     stain=[new Float32Array(s),new Float32Array(s),new Float32Array(s)];
-    scratch=new Float32Array(s);
     gridCanvas.width=N; gridCanvas.height=M; imgData=GC.createImageData(N,M);
   }
   function setBnd(b,x){
@@ -235,18 +237,6 @@
   }
   // when the canvas fills with stuck ink, slowly zoom out (shrink toward centre) to open fresh space
   function fillLevel(){ var c=0,s=N*M; for(var q=0;q<s;q++){ if(stain[0][q]+stain[1][q]+stain[2][q]>0.6) c++; } return c/s; }
-  function zoomFields(k){
-    var fx=(N-1)*0.5, fy=(M-1)*0.5, ik=1/k, fields=[stain[0],stain[1],stain[2],dye[0],dye[1],dye[2]], fi,i,j;
-    for(fi=0;fi<fields.length;fi++){ var F=fields[fi];
-      for(j=0;j<M;j++)for(i=0;i<N;i++){ var sx=fx+(i-fx)*ik, sy=fy+(j-fy)*ik, val;
-        if(sx<0||sy<0||sx>N-1||sy>M-1) val=0;
-        else { var i0=sx|0,i1=Math.min(N-1,i0+1),j0=sy|0,j1=Math.min(M-1,j0+1),s1=sx-i0,s0=1-s1,t1=sy-j0,t0=1-t1;
-          val=s0*(t0*F[IX(i0,j0)]+t1*F[IX(i0,j1)])+s1*(t0*F[IX(i1,j0)]+t1*F[IX(i1,j1)]); }
-        scratch[IX(i,j)]=val;
-      }
-      F.set(scratch);
-    }
-  }
   function injectMass(cx,cy,radius,ab,vx,vy,turb){
     var r2=radius*radius, i0=Math.max(1,(cx-radius*2.2)|0), i1=Math.min(N-2,Math.ceil(cx+radius*2.2)), j0=Math.max(1,(cy-radius*2.2)|0), j1=Math.min(M-2,Math.ceil(cy+radius*2.2));
     for(var j=j0;j<=j1;j++)for(var i=i0;i<=i1;i++){ var dx=i-cx,dy=j-cy,g=Math.exp(-(dx*dx+dy*dy)/r2); if(g<0.01)continue; var id=IX(i,j);
@@ -509,7 +499,7 @@
   }
 
   // ---------- main loop (always simulating) ----------
-  var lastFrame=performance.now(), acc=0, zoomTick=0, curFill=0, FILL_THRESH=0.52, ZOOM_SPEED=1.4;
+  var lastFrame=performance.now(), acc=0, zoomTick=0, curFill=0;
   function loop(ts){
     requestAnimationFrame(loop); frameN++;
     var now=ts||performance.now(), dt=Math.min(0.05,(now-lastFrame)/1000); lastFrame=now;
@@ -522,8 +512,7 @@
     if(steps===0){ stepFluid(Math.max(0.008,dt)); acc=0; }
     updateRacers(dt); updateFormers(dt);
     // tank full -> slowly zoom out so more clear water opens above the sediment
-    zoomTick+=dt; if(zoomTick>0.12){ zoomTick=0; curFill=fillLevel(); }
-    if(curFill>FILL_THRESH){ var zk=1-((curFill-FILL_THRESH)*ZOOM_SPEED)*dt; if(zk<0.9865)zk=0.9865; zoomFields(zk); }
+    zoomTick+=dt; if(zoomTick>0.2){ zoomTick=0; curFill=fillLevel(); }   // coverage (used by the big-form gate)
     render();
     if(!painted){ hintTimer+=dt; if(hintTimer>6){ painted=true; hint.classList.add('gone'); } }
   }
@@ -552,6 +541,30 @@
   toggle.addEventListener('click',function(){ if(running) stop(); else start(); });
   clearBtn.addEventListener('click', clearWater);
   saveBtn.addEventListener('click',function(){ var a=document.createElement('a'); a.download='sound-seen-'+Date.now()+'.png'; a.href=paper.toDataURL('image/png'); a.click(); });
+
+  // ---------- screen + audio recording ----------
+  var recordBtn=document.getElementById('record'), mediaRecorder=null, recChunks=[], recording=false;
+  function startRecording(){
+    if(!paper.captureStream || typeof MediaRecorder==='undefined'){ note.classList.add('err'); note.textContent="This browser can't record the canvas. Try a recent Chrome, Edge, or Firefox."; return; }
+    try{
+      var cs=paper.captureStream(30), out=new MediaStream();
+      cs.getVideoTracks().forEach(function(t){ out.addTrack(t); });
+      if(stream){ stream.getAudioTracks().forEach(function(t){ out.addTrack(t); }); }   // include the mic audio if listening
+      var mime='video/webm;codecs=vp9,opus';
+      if(!MediaRecorder.isTypeSupported(mime)) mime='video/webm;codecs=vp8,opus';
+      if(!MediaRecorder.isTypeSupported(mime)) mime='video/webm';
+      mediaRecorder=new MediaRecorder(out,{mimeType:mime, videoBitsPerSecond:6000000});
+      recChunks=[];
+      mediaRecorder.ondataavailable=function(e){ if(e.data&&e.data.size>0) recChunks.push(e.data); };
+      mediaRecorder.onstop=function(){ var blob=new Blob(recChunks,{type:'video/webm'}); var url=URL.createObjectURL(blob);
+        var a=document.createElement('a'); a.href=url; a.download='sound-seen-'+Date.now()+'.webm'; a.click(); setTimeout(function(){ URL.revokeObjectURL(url); },1500); };
+      mediaRecorder.start();
+      recording=true; recordBtn.textContent='Stop recording'; recordBtn.classList.add('rec');
+      note.classList.remove('err'); note.textContent = stream ? 'Recording the canvas with your microphone audio. Press Stop to download the video.' : 'Recording the canvas (no audio — press Begin listening first to capture sound). Press Stop to download.';
+    }catch(e){ note.classList.add('err'); note.textContent="Couldn't start recording"+(e&&e.message?(": "+e.message):"."); }
+  }
+  function stopRecording(){ if(mediaRecorder&&recording){ try{ mediaRecorder.stop(); }catch(e){} recording=false; recordBtn.textContent='Record'; recordBtn.classList.remove('rec'); } }
+  recordBtn.addEventListener('click',function(){ if(recording) stopRecording(); else startRecording(); });
   function setMode(t){ turbulent=t; mScatter.setAttribute('aria-pressed',(!t).toString()); mCompose.setAttribute('aria-pressed',t.toString()); }
   mScatter.addEventListener('click',function(){ setMode(false); });
   mCompose.addEventListener('click',function(){ setMode(true); });
