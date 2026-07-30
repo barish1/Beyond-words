@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>sound, seen</title>
+<title>Beyond Words</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,340;9..144,460&family=Inter:wght@400;500&display=swap" rel="stylesheet" />
@@ -25,8 +25,9 @@
   .stage{ width:100%; max-width:900px; margin:0 auto; }
   header{ display:flex; align-items:baseline; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:clamp(14px,2.4vw,22px); }
   .title-wrap{ display:flex; flex-direction:column; gap:4px; }
-  h1{ font-family:var(--serif); font-weight:340; font-size:clamp(2.1rem,6vw,3.35rem); letter-spacing:-0.015em; line-height:0.98; margin:0; color:#f3eede; }
+  h1{ font-family:var(--serif); font-weight:460; font-size:clamp(2.2rem,6.4vw,3.6rem); letter-spacing:-0.01em; line-height:0.98; margin:0; color:#f3eede; }
   h1 em{ font-style:italic; color:var(--brass); }
+  .subtitle{ font-family:var(--mono); font-size:clamp(0.72rem,1.6vw,0.86rem); letter-spacing:0.34em; text-transform:lowercase; color:var(--mute); margin:6px 0 0 2px; }
   .tagline{ font-size:clamp(0.78rem,1.7vw,0.9rem); color:var(--mute); letter-spacing:0.01em; max-width:50ch; }
   .status{ display:flex; align-items:center; gap:8px; font-family:var(--mono); font-size:0.72rem; letter-spacing:0.14em; text-transform:uppercase; color:var(--mute); white-space:nowrap; padding-top:6px; }
   .dot{ width:7px; height:7px; border-radius:50%; background:var(--line); flex:none; }
@@ -83,8 +84,8 @@
   <div class="stage">
     <header>
       <div class="title-wrap">
-        <h1>sound, <em>seen</em></h1>
-        <p class="tagline">Colored ink released into clear water, filmed in slow motion. Each sound drops fresh ink that blooms, folds, and sticks where it settles, building up across the canvas.</p>
+        <h1>Beyond Words</h1>
+        <p class="subtitle">digital synesthesia</p>
       </div>
       <div class="status" id="status" data-live="off" role="status" aria-live="polite">
         <span class="dot"></span><span id="statusText">Idle</span>
@@ -101,7 +102,6 @@
       <div class="meter">
         <span>level</span>
         <span class="bar"><i id="lvl"></i></span>
-        <span class="note-out" id="noteOut">—</span>
       </div>
     </div>
 
@@ -131,7 +131,7 @@
   var frame=document.getElementById('frame'), hint=document.getElementById('hint');
   var toggle=document.getElementById('toggle'), clearBtn=document.getElementById('clear'), saveBtn=document.getElementById('save');
   var sensEl=document.getElementById('sens'), statusEl=document.getElementById('status'), statusText=document.getElementById('statusText');
-  var lvlEl=document.getElementById('lvl'), noteOut=document.getElementById('noteOut'), note=document.getElementById('note');
+  var lvlEl=document.getElementById('lvl'), noteOut={innerHTML:'',textContent:''}, note=document.getElementById('note');
   var mScatter=document.getElementById('mScatter'), mCompose=document.getElementById('mCompose');
   var reduce=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
