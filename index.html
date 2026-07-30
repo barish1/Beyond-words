@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>sound, seen</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,340;9..144,460&family=Inter:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --ink:#0e1315; --ink-2:#141b1d; --panel:#171f21;
+    --bone:#e8e2d4; --mute:#828b88; --brass:#c69a5c;
+    --line:#26302f; --water:#fafbfc;
+    --serif:"Fraunces", Georgia, "Times New Roman", serif;
+    --sans:"Inter", system-ui, -apple-system, sans-serif;
+    --mono:ui-monospace, "SF Mono", "Cascadia Code", Menlo, monospace;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; height:100%; }
+  body{ font-family:var(--sans); color:var(--bone);
+    background:radial-gradient(120% 90% at 50% 34%, #1a2325 0%, #10171899 42%, var(--ink) 78%), var(--ink);
+    min-height:100dvh; display:flex; flex-direction:column; align-items:center;
+    padding:clamp(16px,3.5vw,40px) clamp(16px,4vw,40px) clamp(28px,4vw,48px); -webkit-font-smoothing:antialiased; }
+  .stage{ width:100%; max-width:900px; margin:0 auto; }
+  header{ display:flex; align-items:baseline; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:clamp(14px,2.4vw,22px); }
+  .title-wrap{ display:flex; flex-direction:column; gap:4px; }
+  h1{ font-family:var(--serif); font-weight:340; font-size:clamp(2.1rem,6vw,3.35rem); letter-spacing:-0.015em; line-height:0.98; margin:0; color:#f3eede; }
+  h1 em{ font-style:italic; color:var(--brass); }
+  .tagline{ font-size:clamp(0.78rem,1.7vw,0.9rem); color:var(--mute); letter-spacing:0.01em; max-width:50ch; }
+  .status{ display:flex; align-items:center; gap:8px; font-family:var(--mono); font-size:0.72rem; letter-spacing:0.14em; text-transform:uppercase; color:var(--mute); white-space:nowrap; padding-top:6px; }
+  .dot{ width:7px; height:7px; border-radius:50%; background:var(--line); flex:none; }
+  .status[data-live="on"] .dot{ background:var(--brass); animation:pulse 2.4s ease-out infinite; }
+  @keyframes pulse{ 0%{ box-shadow:0 0 0 0 rgba(198,154,92,0.55);} 70%{ box-shadow:0 0 0 7px rgba(198,154,92,0);} 100%{ box-shadow:0 0 0 0 rgba(198,154,92,0);} }
+  .sheet-frame{ position:relative; width:100%; aspect-ratio:3/2; border-radius:3px; overflow:hidden; background:var(--water);
+    box-shadow:0 40px 90px -30px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.04), 0 0 120px -20px rgba(120,160,200,0.08); transition:box-shadow .6s ease; }
+  .sheet-frame[data-live="on"]{ animation:breathe 5.5s ease-in-out infinite; }
+  @keyframes breathe{
+    0%,100%{ box-shadow:0 40px 90px -30px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.05), 0 0 120px -10px rgba(120,160,200,0.12);}
+    50%{ box-shadow:0 44px 96px -30px rgba(0,0,0,0.87), 0 0 0 1px rgba(255,255,255,0.07), 0 0 160px 0px rgba(120,160,200,0.22);}
+  }
+  canvas{ position:absolute; inset:0; width:100%; height:100%; display:block; }
+  .hint{ position:absolute; inset:0; display:grid; place-items:center; pointer-events:none;
+    font-family:var(--serif); font-style:italic; font-size:clamp(1rem,2.6vw,1.4rem); color:#8593a2; transition:opacity 1.4s ease; }
+  .hint.gone{ opacity:0; }
+  .legend{ display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-top:12px; font-family:var(--mono); font-size:0.68rem; letter-spacing:0.06em; color:var(--mute); }
+  .scale{ display:flex; align-items:center; gap:8px; }
+  .swatch{ width:120px; height:8px; border-radius:4px; background:linear-gradient(90deg,#2c3a86,#286f78,#7a4a8e,#a83a5a,#b06a2e,#b89a3a,#2f7a52); }
+  .meter{ display:flex; align-items:center; gap:10px; }
+  .bar{ width:88px; height:6px; border-radius:3px; background:#20292a; overflow:hidden; }
+  .bar > i{ display:block; height:100%; width:0%; background:linear-gradient(90deg,#2f6f6b,var(--brass)); transition:width .07s linear; }
+  .note-out{ min-width:100px; text-align:right; color:var(--bone); }
+  .note-out b{ color:var(--brass); font-weight:500; }
+  .note-out .mk{ color:var(--mute); }
+  .controls{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-top:20px; }
+  button{ font-family:var(--sans); font-size:0.9rem; font-weight:500; cursor:pointer; border-radius:999px; border:1px solid var(--line); background:var(--panel); color:var(--bone); padding:11px 20px; transition:border-color .2s ease, background .2s ease, transform .05s ease; }
+  button:hover{ border-color:#3a4644; }
+  button:active{ transform:translateY(1px); }
+  button:focus-visible{ outline:2px solid var(--brass); outline-offset:2px; }
+  .primary{ background:linear-gradient(180deg,#1d2628,#141b1d); border-color:#3a4644; color:#f3eede; padding-left:24px; padding-right:24px; }
+  .primary[data-live="on"]{ border-color:var(--brass); color:var(--brass); }
+  button[disabled]{ opacity:0.4; cursor:not-allowed; }
+  .spacer{ flex:1 1 auto; min-width:8px; }
+  .ghost{ background:transparent; }
+  .seg{ display:inline-flex; border:1px solid var(--line); border-radius:999px; overflow:hidden; }
+  .seg button{ border:0; border-radius:0; background:transparent; color:var(--mute); padding:10px 16px; font-size:0.82rem; }
+  .seg button[aria-pressed="true"]{ background:var(--panel); color:var(--bone); box-shadow:inset 0 0 0 1px #3a4644; }
+  .seg button:focus-visible{ outline:2px solid var(--brass); outline-offset:-2px; }
+  .sens{ display:flex; align-items:center; gap:10px; font-family:var(--mono); font-size:0.66rem; letter-spacing:0.1em; text-transform:uppercase; color:var(--mute); }
+  input[type=range]{ -webkit-appearance:none; appearance:none; width:110px; height:4px; border-radius:2px; background:#20292a; outline:none; }
+  input[type=range]::-webkit-slider-thumb{ -webkit-appearance:none; width:15px; height:15px; border-radius:50%; background:var(--brass); border:2px solid #0e1315; cursor:pointer; }
+  input[type=range]::-moz-range-thumb{ width:15px; height:15px; border-radius:50%; background:var(--brass); border:2px solid #0e1315; cursor:pointer; }
+  input[type=range]:focus-visible{ outline:2px solid var(--brass); outline-offset:4px; }
+  .note{ margin-top:16px; font-size:0.78rem; color:var(--mute); line-height:1.5; max-width:66ch; }
+  .note.err{ color:#e0a58a; }
+  @media (max-width:640px){ .sheet-frame{ aspect-ratio:4/5; } header{ gap:6px; } .spacer{ display:none; } .primary{ flex:1 1 100%; } .swatch{ width:92px; } }
+  @media (prefers-reduced-motion: reduce){ .sheet-frame[data-live="on"]{ animation:none; } .status[data-live="on"] .dot{ animation:none; } }
+</style>
+</head>
+<body>
+  <div class="stage">
+    <header>
+      <div class="title-wrap">
+        <h1>sound, <em>seen</em></h1>
+        <p class="tagline">Colored ink released into clear water, filmed in slow motion. Each sound drops fresh ink that blooms, folds, and sticks where it settles, building up across the canvas.</p>
+      </div>
+      <div class="status" id="status" data-live="off" role="status" aria-live="polite">
+        <span class="dot"></span><span id="statusText">Idle</span>
+      </div>
+    </header>
+
+    <div class="sheet-frame" id="frame" data-live="off">
+      <canvas id="paper"></canvas>
+      <div class="hint" id="hint">press begin to drop ink</div>
+    </div>
+
+    <div class="legend" aria-hidden="true">
+      <div class="scale"><span>ink</span><span class="swatch"></span></div>
+      <div class="meter">
+        <span>level</span>
+        <span class="bar"><i id="lvl"></i></span>
+        <span class="note-out" id="noteOut">—</span>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button class="primary" id="toggle" data-live="off">Begin listening</button>
+      <div class="seg" role="group" aria-label="Turbulence">
+        <button id="mScatter" aria-pressed="true">Calm</button>
+        <button id="mCompose" aria-pressed="false">Turbulent</button>
+      </div>
+      <div class="sens">
+        <label for="sens">sensitivity</label>
+        <input type="range" id="sens" min="0" max="100" value="55" aria-label="Microphone sensitivity" />
+      </div>
+      <span class="spacer"></span>
+      <button class="ghost" id="clear">Clear water</button>
+      <button class="ghost" id="save">Save frame</button>
+    </div>
+
+    <p class="note" id="note">Press Begin, then speak, hum, or play music — quiet sounds drop a small tendril of ink, louder sounds release a heavy plume that blooms and folds. Nothing is recorded or uploaded — audio is read on your device and turned into ink.</p>
+  </div>
+
+<script>
+(function(){
+  "use strict";
+  var paper=document.getElementById('paper'), P=paper.getContext('2d');
+  var frame=document.getElementById('frame'), hint=document.getElementById('hint');
+  var toggle=document.getElementById('toggle'), clearBtn=document.getElementById('clear'), saveBtn=document.getElementById('save');
+  var sensEl=document.getElementById('sens'), statusEl=document.getElementById('status'), statusText=document.getElementById('statusText');
+  var lvlEl=document.getElementById('lvl'), noteOut=document.getElementById('noteOut'), note=document.getElementById('note');
+  var mScatter=document.getElementById('mScatter'), mCompose=document.getElementById('mCompose');
+  var reduce=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  var W=0,H=0,dpr=1, turbulent=false;
+  function clamp(v,lo,hi){ return v<lo?lo:v>hi?hi:v; }
+  function lerp(a,b,f){ return a+(b-a)*f; }
+  function rnd(a,b){ return a+Math.random()*(b-a); }
+  function gauss(){ var u=0,v=0; while(u===0)u=Math.random(); while(v===0)v=Math.random(); return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v); }
+
+  // ---------- fluid grid (stable fluids) ----------
+  var N=150, M=100, gridCanvas=document.createElement('canvas'), GC=gridCanvas.getContext('2d'), imgData=null;
+  var u,v,u0,v0,pf,divf,curlf, dye, dye0, stain, scratch, IXo=0;
+  function IX(i,j){ return i+j*N; }
+  function alloc(){
+    var s=N*M;
+    u=new Float32Array(s); v=new Float32Array(s); u0=new Float32Array(s); v0=new Float32Array(s);
+    pf=new Float32Array(s); divf=new Float32Array(s); curlf=new Float32Array(s);
+    dye=[new Float32Array(s),new Float32Array(s),new Float32Array(s)];
+    dye0=[new Float32Array(s),new Float32Array(s),new Float32Array(s)];
+    stain=[new Float32Array(s),new Float32Array(s),new Float32Array(s)];
+    scratch=new Float32Array(s);
+    gridCanvas.width=N; gridCanvas.height=M; imgData=GC.createImageData(N,M);
+  }
+  function setBnd(b,x){
+    for(var i=1;i<N-1;i++){ x[IX(i,0)]=(b===2?-1:1)*x[IX(i,1)]; x[IX(i,M-1)]=(b===2?-1:1)*x[IX(i,M-2)]; }
+    for(var j=1;j<M-1;j++){ x[IX(0,j)]=(b===1?-1:1)*x[IX(1,j)]; x[IX(N-1,j)]=(b===1?-1:1)*x[IX(N-2,j)]; }
+  }
+  function linSolve(b,x,x0,a,c,iter){
+    var invc=1/c;
+    for(var k=0;k<iter;k++){
+      for(var j=1;j<M-1;j++){ var row=j*N; for(var i=1;i<N-1;i++){ var id=row+i;
+        x[id]=(x0[id]+a*(x[id-1]+x[id+1]+x[id-N]+x[id+N]))*invc; } }
+      setBnd(b,x);
+    }
+  }
+  function project(u,v,p,div){
+    for(var j=1;j<M-1;j++){ var row=j*N; for(var i=1;i<N-1;i++){ var id=row+i;
+      div[id]=-0.5*(u[id+1]-u[id-1]+v[id+N]-v[id-N]); p[id]=0; } }
+    setBnd(0,div); setBnd(0,p); linSolve(0,p,div,1,4,PRESSURE_ITERS);
+    for(var j2=1;j2<M-1;j2++){ var r2=j2*N; for(var i2=1;i2<N-1;i2++){ var id2=r2+i2;
+      u[id2]-=0.5*(p[id2+1]-p[id2-1]); v[id2]-=0.5*(p[id2+N]-p[id2-N]); } }
+    setBnd(1,u); setBnd(2,v);
+  }
+  function advect(b,dn,d0,uu,vv,dt){
+    var dt0=dt*N;
+    for(var j=1;j<M-1;j++){ for(var i=1;i<N-1;i++){ var id=IX(i,j);
+      var x=i-dt0*uu[id], y=j-dt0*vv[id];
+      if(x<0.5)x=0.5; if(x>N-1.5)x=N-1.5; if(y<0.5)y=0.5; if(y>M-1.5)y=M-1.5;
+      var i0=x|0,i1=i0+1,j0=y|0,j1=j0+1, s1=x-i0,s0=1-s1,t1=y-j0,t0=1-t1;
+      dn[id]=s0*(t0*d0[IX(i0,j0)]+t1*d0[IX(i0,j1)])+s1*(t0*d0[IX(i1,j0)]+t1*d0[IX(i1,j1)]);
+    } }
+    setBnd(b,dn);
+  }
+  function vorticity(strength,dt){
+    for(var j=1;j<M-1;j++)for(var i=1;i<N-1;i++){ var id=IX(i,j); curlf[id]=0.5*((v[id+1]-v[id-1])-(u[id+N]-u[id-N])); }
+    for(var j2=1;j2<M-1;j2++)for(var i2=1;i2<N-1;i2++){ var id2=IX(i2,j2);
+      var dx=0.5*(Math.abs(curlf[id2+1])-Math.abs(curlf[id2-1]));
+      var dy=0.5*(Math.abs(curlf[id2+N])-Math.abs(curlf[id2-N]));
+      var len=Math.sqrt(dx*dx+dy*dy)+1e-5; dx/=len; dy/=len; var c=curlf[id2];
+      u[id2]+=strength*dt*dy*c; v[id2]-=strength*dt*dx*c;
+    }
+  }
+  var PRESSURE_ITERS=14, GRAVITY=0.28, VEL_DECAY=0.9986, DYE_DECAY=0.9994, VORT=7.0, VCAP=3.0;
+  function stepFluid(dt){
+    var vv=turbulent?VORT*1.7:VORT, grav=GRAVITY;
+    vorticity(vv,dt);
+    for(var j=1;j<M-1;j++)for(var i=1;i<N-1;i++){ var id=IX(i,j);
+      var dens=dye[0][id]+dye[1][id]+dye[2][id]; v[id]+=grav*dens*dt;
+      // clamp velocity to keep motion coherent, not explosive
+      if(u[id]>VCAP)u[id]=VCAP; else if(u[id]<-VCAP)u[id]=-VCAP;
+      if(v[id]>VCAP)v[id]=VCAP; else if(v[id]<-VCAP)v[id]=-VCAP;
+    }
+    project(u,v,u0,v0);
+    u0.set(u); v0.set(v);
+    advect(1,u,u0,u0,v0,dt); advect(2,v,v0,u0,v0,dt);
+    project(u,v,u0,v0);
+    for(var c=0;c<3;c++){ dye0[c].set(dye[c]); advect(0,dye[c],dye0[c],u,v,dt); }
+    var vd=VEL_DECAY, dd=DYE_DECAY, sf=(FADE_NOW?STAIN_FADE:1), s=N*M;
+    for(var q=0;q<s;q++){ u[q]*=vd; v[q]*=vd; dye[0][q]*=dd; dye[1][q]*=dd; dye[2][q]*=dd; stain[0][q]*=sf; stain[1][q]*=sf; stain[2][q]*=sf; }
+    settleAndPile(dt);
+  }
+  // ink that slows down sticks in place, anywhere on the canvas. Deposits are hue-preserving and density-capped
+  // (never sum to a black blob) and slowly fade so old sounds clear.
+  var STICK_REF=1.0, STAIN_CAP=2.2, STAIN_FADE=0.99925, FADE_NOW=false;
+  function settleAndPile(dt){
+    var sr=(reduce?0.4:0.7)*dt, i,j,id;
+    for(j=1;j<M-1;j++){
+      var tb=1+0.7*Math.max(0,1-j/(M*0.25));   // slightly more ink sticks near the very top
+      for(i=1;i<N-1;i++){ id=IX(i,j);
+        var d0=dye[0][id],d1=dye[1][id],d2=dye[2][id]; if(d0+d1+d2<0.02) continue;
+        var sp=Math.abs(u[id])+Math.abs(v[id]), slow=1-sp/STICK_REF; if(slow<=0) continue;
+        var f=sr*slow*0.6*tb; if(f>0.5)f=0.5;
+        var a0=d0*f,a1=d1*f,a2=d2*f, inTot=a0+a1+a2; if(inTot<1e-5) continue;
+        dye[0][id]-=a0; dye[1][id]-=a1; dye[2][id]-=a2;
+        // blend hue toward the incoming ink and cap the density -> stays colourful, can't go black
+        var e0=stain[0][id],e1=stain[1][id],e2=stain[2][id], eTot=e0+e1+e2;
+        var nt=eTot+inTot; if(nt>STAIN_CAP)nt=STAIN_CAP;
+        var w=Math.min(0.9,inTot/(eTot+inTot)*3);
+        var ih0=a0/inTot,ih1=a1/inTot,ih2=a2/inTot;
+        var oh0=eTot>1e-5?e0/eTot:ih0, oh1=eTot>1e-5?e1/eTot:ih1, oh2=eTot>1e-5?e2/eTot:ih2;
+        stain[0][id]=(oh0+(ih0-oh0)*w)*nt; stain[1][id]=(oh1+(ih1-oh1)*w)*nt; stain[2][id]=(oh2+(ih2-oh2)*w)*nt;
+      }
+    }
+  }
+  // when the canvas fills with stuck ink, slowly zoom out (shrink toward centre) to open fresh space
+  function fillLevel(){ var c=0,s=N*M; for(var q=0;q<s;q++){ if(stain[0][q]+stain[1][q]+stain[2][q]>0.6) c++; } return c/s; }
+  function zoomFields(k){
+    var fx=(N-1)*0.5, fy=(M-1)*0.5, ik=1/k, fields=[stain[0],stain[1],stain[2],dye[0],dye[1],dye[2]], fi,i,j;
+    for(fi=0;fi<fields.length;fi++){ var F=fields[fi];
+      for(j=0;j<M;j++)for(i=0;i<N;i++){ var sx=fx+(i-fx)*ik, sy=fy+(j-fy)*ik, val;
+        if(sx<0||sy<0||sx>N-1||sy>M-1) val=0;
+        else { var i0=sx|0,i1=Math.min(N-1,i0+1),j0=sy|0,j1=Math.min(M-1,j0+1),s1=sx-i0,s0=1-s1,t1=sy-j0,t0=1-t1;
+          val=s0*(t0*F[IX(i0,j0)]+t1*F[IX(i0,j1)])+s1*(t0*F[IX(i1,j0)]+t1*F[IX(i1,j1)]); }
+        scratch[IX(i,j)]=val;
+      }
+      F.set(scratch);
+    }
+  }
+  function injectMass(cx,cy,radius,ab,vx,vy,turb){
+    var r2=radius*radius, i0=Math.max(1,(cx-radius*2.2)|0), i1=Math.min(N-2,Math.ceil(cx+radius*2.2)), j0=Math.max(1,(cy-radius*2.2)|0), j1=Math.min(M-2,Math.ceil(cy+radius*2.2));
+    for(var j=j0;j<=j1;j++)for(var i=i0;i<=i1;i++){ var dx=i-cx,dy=j-cy,g=Math.exp(-(dx*dx+dy*dy)/r2); if(g<0.01)continue; var id=IX(i,j);
+      dye[0][id]+=ab[0]*g; dye[1][id]+=ab[1]*g; dye[2][id]+=ab[2]*g;
+      u[id]+=(vx+(Math.random()-0.5)*turb)*g; v[id]+=(vy+(Math.random()-0.5)*turb)*g; }
+  }
+
+  // ---------- ink colours (absorbance) + slow palette drift ----------
+  var INKS=[ [2.3,1.8,0.6],[2.0,1.0,1.2],[2.4,1.5,0.4],[1.5,1.9,0.9],[0.6,2.1,1.8],[0.6,1.6,2.3],[0.5,1.0,2.4],[1.5,0.7,1.9] ];
+  var palShift=0;
+  function inkAt(tone){ tone=clamp((tone+palShift)%1,0,1); var s=tone*(INKS.length-1), i=Math.floor(s), f=s-i, a=INKS[i], b=INKS[Math.min(i+1,INKS.length-1)];
+    return [ (a[0]+(b[0]-a[0])*f)*(0.85+Math.random()*0.3), (a[1]+(b[1]-a[1])*f)*(0.85+Math.random()*0.3), (a[2]+(b[2]-a[2])*f)*(0.85+Math.random()*0.3) ]; }
+
+  // ---------- ink release (spec-mapped by intensity) ----------
+  var lastX=[];
+  function pickX(){
+    var best=N*0.5, bestd=-1;
+    for(var t=0;t<8;t++){ var x=rnd(N*0.14,N*0.86), nd=1e9; for(var k=0;k<lastX.length;k++){ var d=Math.abs(lastX[k]-x); if(d<nd)nd=d; } if(nd>bestd){ bestd=nd; best=x; } }
+    lastX.push(best); if(lastX.length>5) lastX.shift(); return best;
+  }
+  function injectInk(intensity, tone){
+    intensity=clamp(intensity,0,1);
+    var cx=pickX(), cy=M*rnd(0.15,0.8);
+    var conc=(reduce?1.0:1.6)+intensity*3.4;
+    var radius=lerp(3.2,9.5,intensity)*Math.min(1,M/100);
+    var vy=lerp(0.02,0.18,intensity)*(reduce?0.5:1);
+    var turb=(0.08+intensity*0.45)*(turbulent?1.7:1)*(reduce?0.4:1);
+    var ab=inkAt(tone), C=[ab[0]*conc,ab[1]*conc,ab[2]*conc];
+    // dense body + thin entry neck above (asymmetry via offset satellites)
+    injectMass(cx,cy,radius, C, rnd(-0.05,0.05), vy, turb);
+    injectMass(cx+gauss()*radius*0.4, cy-radius*0.9, radius*0.5, [C[0]*0.5,C[1]*0.5,C[2]*0.5], 0, vy*0.6, turb*0.5);
+    if(intensity>0.5){ injectMass(cx+gauss()*radius, cy+gauss()*radius*0.5, radius*rnd(0.5,0.8), [C[0]*0.7,C[1]*0.7,C[2]*0.7], gauss()*0.15, vy*rnd(0.7,1.1), turb); }
+    if(intensity>0.66){ var ab2=inkAt(tone+0.35), c2=conc*0.8; injectMass(cx+gauss()*radius*1.4, cy+radius*0.6, radius*0.7, [ab2[0]*c2,ab2[1]*c2,ab2[2]*c2], gauss()*0.2, vy*1.1, turb*1.3); }
+    mark();
+  }
+
+  // ---------- racing lines, splats, and combined-sound shapes ----------
+  var racers=[];
+  function spawnRacer(tone,intensity){
+    if(racers.length>=8) racers.shift();
+    var col=inkAt(tone), sp=1.6+intensity*2.2, e=Math.random(), x,y,vx,vy;
+    if(e<0.25){ x=N*0.05; y=rnd(M*0.2,M*0.8); vx=sp; vy=gauss()*0.4; }
+    else if(e<0.5){ x=N*0.95; y=rnd(M*0.2,M*0.8); vx=-sp; vy=gauss()*0.4; }
+    else if(e<0.75){ x=rnd(N*0.2,N*0.8); y=M*0.06; vx=gauss()*0.6; vy=sp*0.7; }
+    else { x=rnd(N*0.2,N*0.8); y=M*0.94; vx=gauss()*0.6; vy=-sp*0.7; }
+    racers.push({x:x,y:y,vx:vx,vy:vy,col:col,life:rnd(1.4,2.8),w:1.4+intensity*1.6}); mark();
+  }
+  function updateRacers(dt){
+    for(var r=racers.length-1;r>=0;r--){ var R=racers[r];
+      var id=IX(clamp(R.x|0,1,N-2),clamp(R.y|0,1,M-2));
+      R.vx+=u[id]*0.25; R.vy+=v[id]*0.25;                    // curve with the water
+      var sp=Math.hypot(R.vx,R.vy), mx=3.6; if(sp>mx){ R.vx*=mx/sp; R.vy*=mx/sp; }
+      R.x+=R.vx*dt*60*0.4; R.y+=R.vy*dt*60*0.4;
+      if(R.x<2){R.x=2;R.vx=Math.abs(R.vx);} else if(R.x>N-3){R.x=N-3;R.vx=-Math.abs(R.vx);}
+      if(R.y<2){R.y=2;R.vy=Math.abs(R.vy);} else if(R.y>M-3){R.y=M-3;R.vy=-Math.abs(R.vy);}
+      injectMass(R.x,R.y, R.w, [R.col[0]*1.3,R.col[1]*1.3,R.col[2]*1.3], R.vx*0.12, R.vy*0.12, 0.08); // ink trail + stir
+      R.life-=dt; if(R.life<=0) racers.splice(r,1);
+    }
+  }
+  function injectSplat(cx,cy,tone,intensity){
+    var col=inkAt(tone), dir=Math.random()*6.283, spread=rnd(0.5,1.2), n=6+Math.round(intensity*12), sp=1.0+intensity*2.6, conc=1.4+intensity*2.2;
+    injectMass(cx,cy, 2.6+intensity*3, [col[0]*conc,col[1]*conc,col[2]*conc], 0,0, 0.35);
+    for(var k=0;k<n;k++){ var a=dir+gauss()*spread, dist=Math.abs(gauss())*(4+intensity*12);
+      injectMass(cx+Math.cos(a)*dist, cy+Math.sin(a)*dist, rnd(1,2.6), [col[0]*conc*0.8,col[1]*conc*0.8,col[2]*conc*0.8], Math.cos(a)*sp, Math.sin(a)*sp, 0.4); }
+    mark();
+  }
+  function injectShape(cx,cy,tone,kind,scale){
+    var col=inkAt(tone), pts=kind==='ring'?28:kind==='spiral'?36:kind==='arc'?18:24, conc=1.9;
+    for(var k=0;k<pts;k++){ var t=k/pts, a,r;
+      if(kind==='ring'){ a=t*6.283; r=scale; }
+      else if(kind==='spiral'){ a=t*6.283*2.3; r=scale*(0.15+0.85*t); }
+      else if(kind==='arc'){ a=Math.PI*0.15+t*Math.PI*0.7; r=scale; }
+      else { a=t*6.283; r=scale*(0.62+0.38*Math.sin(t*12)); }
+      injectMass(cx+Math.cos(a)*r, cy+Math.sin(a)*r, 1.5+scale*0.05, [col[0]*conc,col[1]*conc,col[2]*conc], 0,0, 0.04); }
+    mark();
+  }
+  var SHAPES=['ring','spiral','arc','wavy'];
+  function pickPoint(){ return { x:rnd(N*0.22,N*0.78), y:rnd(M*0.28,M*0.68) }; }
+
+  // ---------- formers: ink that slowly gathers into shadowy figures, mountains, oceans, buildings ----------
+  var formers=[];
+  function shadowColor(tone){ var ink=inkAt(tone), n=[1.5,1.5,1.65]; return [(n[0]+ink[0])*0.5,(n[1]+ink[1])*0.5,(n[2]+ink[2])*0.5]; }
+  function pb(pts,x,y,r){ if(x>1&&x<N-1&&y>1&&y<M-1) pts.push({x:x+gauss()*0.3,y:y+gauss()*0.3,r:r}); }
+  function figurePts(pts,cx,by,h){
+    var hr=h*0.15, hy=by-h*0.86;
+    pb(pts,cx,hy,hr); pb(pts,cx,hy,hr*0.7);
+    var st=Math.max(4,(h*0.5)|0);
+    for(var t=0;t<=st;t++){ var f=t/st, y=lerp(hy+hr,by-h*0.36,f), w=hr*(1.45-0.45*f); pb(pts,cx,y,w); }
+    var ls=Math.max(3,(h*0.36)|0);
+    for(var t2=0;t2<=ls;t2++){ var f2=t2/ls, y2=lerp(by-h*0.36,by,f2); pb(pts,cx-h*0.09,y2,hr*0.55); pb(pts,cx+h*0.09,y2,hr*0.55); }
+    pb(pts,cx-hr*1.3,by-h*0.55,hr*0.5); pb(pts,cx+hr*1.3,by-h*0.5,hr*0.5);
+  }
+  function mountainPts(pts,cx,by,w,hgt){
+    var x0=cx-w/2, x1=cx+w/2, sd=rnd(0,100);
+    for(var x=x0;x<=x1;x+=2.2){ var nx=(x-x0)/w;
+      var prof=0.3+0.45*Math.exp(-Math.pow((nx-0.5)*3,2))+0.18*Math.sin(nx*9+sd)+0.12*Math.sin(nx*19+sd*2);
+      prof=clamp(prof,0.12,1); var top=by-hgt*prof;
+      for(var y=top;y<=by;y+=2.2) pb(pts,x,y,1.9);
+    }
+  }
+  function oceanPts(pts,cx,cy,w){
+    var x0=cx-w/2,x1=cx+w/2, bands=3+(Math.random()*3|0);
+    for(var b=0;b<bands;b++){ var y0=cy+b*3.3, amp=1.4+Math.random()*1.2, fr=0.16+Math.random()*0.14, ph=Math.random()*6.28;
+      for(var x=x0;x<=x1;x+=2.0){ var y=y0+Math.sin(x*fr+ph)*amp; pb(pts,x,y,1.6); } }
+  }
+  function buildingPts(pts,cx,by,w,hgt){
+    var x=cx-w/2, x1=cx+w/2;
+    while(x<x1){ var bw=rnd(4,10), bh=hgt*rnd(0.45,1.0);
+      for(var xx=x; xx<=x+bw&&xx<=x1; xx+=2.0) for(var yy=by-bh; yy<=by; yy+=2.3) pb(pts,xx,yy,1.7);
+      x+=bw+rnd(1,4);
+    }
+  }
+  function spawnFormer(kind,intensity,tone){
+    if(formers.length>=3) return;
+    var col=shadowColor(tone), conc=1.6, C=[col[0]*conc,col[1]*conc,col[2]*conc], pts=[];
+    if(kind==='figure'){ figurePts(pts, rnd(N*0.15,N*0.85), rnd(M*0.5,M*0.9), lerp(0.14,0.24,intensity)*M); }
+    else if(kind==='mountain'){ mountainPts(pts, rnd(N*0.3,N*0.7), rnd(M*0.58,M*0.85), rnd(0.32,0.6)*N, rnd(0.24,0.44)*M); }
+    else if(kind==='ocean'){ oceanPts(pts, rnd(N*0.35,N*0.65), rnd(M*0.42,M*0.75), rnd(0.42,0.82)*N); }
+    else { buildingPts(pts, rnd(N*0.35,N*0.65), rnd(M*0.62,M*0.9), rnd(0.36,0.72)*N, rnd(0.34,0.6)*M); }
+    for(var i=pts.length-1;i>0;i--){ var j=Math.random()*(i+1)|0, t=pts[i]; pts[i]=pts[j]; pts[j]=t; } // coalesce, don't draw in order
+    var dur=rnd(1.6,3.0);
+    formers.push({pts:pts,i:0,col:C,perFrame:Math.max(1,Math.ceil(pts.length/(dur*60)))});
+    mark();
+  }
+  function updateFormers(dt){
+    for(var r=formers.length-1;r>=0;r--){ var f=formers[r], k=0;
+      for(;k<f.perFrame && f.i<f.pts.length;k++){ var p=f.pts[f.i++]; injectMass(p.x,p.y,p.r, f.col, 0, 0.003, 0.008); }
+      if(f.i>=f.pts.length) formers.splice(r,1);
+    }
+  }
+  function shuffle(a){ for(var i=a.length-1;i>0;i--){ var j=Math.random()*(i+1)|0, t=a[i]; a[i]=a[j]; a[j]=t; } }
+
+  // ---------- large foreground natural forms: the ink gathers into bridges, arches, trees, hills, rivers, clouds ----------
+  function fgShadow(tone){ var ink=inkAt(tone), n=[1.95,1.9,2.1]; return [(n[0]+ink[0])*0.5,(n[1]+ink[1])*0.5,(n[2]+ink[2])*0.5]; }
+  function bridgePts(pts,cx,deckY,span,baseY){
+    var x0=cx-span/2,x1=cx+span/2, nA=2+(Math.random()*2|0), gap=span/nA, archR=gap*0.42;
+    for(var x=x0;x<=x1;x+=2.2){ pb(pts,x,deckY,2.4); pb(pts,x,deckY-2.7,1.4); }              // deck + railing
+    for(var x2=x0;x2<=x1;x2+=2.4){ var holeTop=baseY+10;
+      for(var a=0;a<nA;a++){ var acx=x0+gap*(a+0.5), dx=x2-acx; if(Math.abs(dx)<archR){ var ah=Math.sqrt(Math.max(0,archR*archR-dx*dx)), ht=baseY-ah; if(ht<holeTop) holeTop=ht; } }
+      for(var y=deckY+2.7;y<=baseY;y+=2.4){ if(y<holeTop) pb(pts,x2,y,1.9); }                 // body with arch openings
+    }
+  }
+  function archPts(pts,cx,topY,w,baseY){ var r=w/2;
+    for(var y=topY+r*0.5;y<=baseY;y+=2.3){ pb(pts,cx-r,y,2.2); pb(pts,cx+r,y,2.2); }           // legs
+    for(var a=0;a<=Math.PI;a+=0.1){ pb(pts, cx-Math.cos(a)*r, topY+r*0.5-Math.sin(a)*r*0.5, 2.2); } // top curve
+  }
+  function treePts(pts,cx,baseY,h){
+    for(var y=baseY-h*0.55;y<=baseY;y+=2.1) pb(pts,cx,y,2.1);                                    // trunk
+    var cyy=baseY-h*0.7, cr=h*0.36;
+    for(var k=0;k<44;k++){ var a=rnd(0,6.28), rr=Math.sqrt(Math.random())*cr; pb(pts, cx+Math.cos(a)*rr, cyy+Math.sin(a)*rr*0.82, 2.5); } // canopy
+    pb(pts,cx-cr*0.5,cyy+cr*0.4,2); pb(pts,cx+cr*0.5,cyy+cr*0.3,2);
+  }
+  function hillsPts(pts,cx,baseY,w,h){ var x0=cx-w/2, sd=rnd(0,10);
+    for(var x=x0;x<=cx+w/2;x+=2.2){ var nx=(x-x0)/w; var prof=clamp(0.42+0.32*Math.sin(nx*5+sd)+0.2*Math.sin(nx*11+sd),0.1,1); var top=baseY-h*prof;
+      for(var y=top;y<=baseY;y+=2.4) pb(pts,x,y,2.1); } }
+  function riverPts(pts,cx,cy,w){ var x0=cx-w/2, ph=rnd(0,6.28);
+    for(var x=x0;x<=cx+w/2;x+=2.0){ var y=cy+Math.sin(x*0.06+ph)*9+Math.sin(x*0.14)*3; for(var t=-3;t<=3;t+=2) pb(pts,x,y+t,1.9); } }
+  function cloudPts(pts,cx,cy,w){ for(var k=0;k<64;k++){ pb(pts, cx+gauss()*w*0.36, cy+gauss()*w*0.13, rnd(2.2,3.6)); } }
+  var BIGFORMS=['bridge','arch','tree','hills','river','cloud'];
+  function spawnBigForm(kind,intensity,tone){
+    if(formers.length>=3) return;
+    var col=fgShadow(tone), conc=1.4, C=[col[0]*conc,col[1]*conc,col[2]*conc], pts=[];
+    if(kind==='bridge') bridgePts(pts, N*0.5, rnd(M*0.36,M*0.5), rnd(0.62,0.92)*N, rnd(M*0.62,M*0.82));
+    else if(kind==='arch') archPts(pts, N*0.5, rnd(M*0.24,M*0.4), rnd(0.3,0.5)*N, rnd(M*0.72,M*0.92));
+    else if(kind==='tree') treePts(pts, rnd(N*0.3,N*0.7), rnd(M*0.78,M*0.94), rnd(0.42,0.62)*M);
+    else if(kind==='hills') hillsPts(pts, N*0.5, rnd(M*0.62,M*0.84), rnd(0.72,0.96)*N, rnd(0.2,0.34)*M);
+    else if(kind==='river') riverPts(pts, N*0.5, rnd(M*0.4,M*0.7), rnd(0.72,0.96)*N);
+    else cloudPts(pts, rnd(N*0.35,N*0.65), rnd(M*0.14,M*0.34), rnd(0.42,0.6)*N);
+    shuffle(pts);
+    var dur=rnd(2.8,4.4);   // subtly come together (slow)
+    formers.push({pts:pts,i:0,col:C,perFrame:Math.max(1,Math.ceil(pts.length/(dur*60)))});
+    mark();
+  }
+
+  // ---------- render (nonlinear absorption over clear water) ----------
+  var ABSORB=1.55, BG=[249,250,252];
+  function render(){
+    var data=imgData.data, s=N*M, r0=dye[0], g0=dye[1], b0=dye[2], s0=stain[0], s1=stain[1], s2=stain[2], RCAP=2.15;
+    for(var q=0;q<s;q++){ var o=q<<2;
+      var ra=r0[q]+s0[q]; if(ra>RCAP)ra=RCAP; var ga=g0[q]+s1[q]; if(ga>RCAP)ga=RCAP; var ba=b0[q]+s2[q]; if(ba>RCAP)ba=RCAP;
+      data[o]=BG[0]*Math.exp(-ra*ABSORB); data[o+1]=BG[1]*Math.exp(-ga*ABSORB); data[o+2]=BG[2]*Math.exp(-ba*ABSORB); data[o+3]=255;
+    }
+    GC.putImageData(imgData,0,0);
+    P.imageSmoothingEnabled=true; P.imageSmoothingQuality='high';
+    P.setTransform(1,0,0,1,0,0); P.clearRect(0,0,paper.width,paper.height);
+    P.drawImage(gridCanvas,0,0,N,M,0,0,paper.width,paper.height);
+  }
+
+  // ---------- palette drift only (no self-generated ink; painting responds to sound alone) ----------
+  var curTone=0.4;
+  function advancePalette(dt){ palShift=(palShift+dt*0.006)%1; }
+
+  // ---------- resize ----------
+  function resize(){
+    var rect=frame.getBoundingClientRect(); W=Math.max(1,Math.round(rect.width)); H=Math.max(1,Math.round(rect.height));
+    dpr=Math.min(window.devicePixelRatio||1,2); paper.width=W*dpr; paper.height=H*dpr;
+    var target = (W*H>520000)?150:120; N=target; M=Math.max(60,Math.round(N*H/W)); PRESSURE_ITERS=(N>140)?14:16;
+    alloc();
+  }
+  function clearWater(){ var s=N*M; for(var q=0;q<s;q++){ u[q]=0; v[q]=0; dye[0][q]=0; dye[1][q]=0; dye[2][q]=0; stain[0][q]=0; stain[1][q]=0; stain[2][q]=0; } racers.length=0; formers.length=0; curFill=0; }
+
+  // ---------- audio (detection unchanged) ----------
+  var running=false, stream=null, audioCtx=null, analyser=null, freqData=null, timeF=null, prevSpec=null;
+  var lastOnset=0, dispLevel=0, frameN=0, lastPitch={freq:-1,clarity:0}, fluxHist=new Float32Array(43), fluxIdx=0, fluxSum=0, prevFlux=0, lastRelease=0, lastRelMidi=-99, lastRelTime=0, painted=false, hintTimer=0;
+  var NOTE_NAMES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+  function sensThreshold(){ var s=(+sensEl.value)/100; return 0.135*(1-s)+0.016; }
+  function setStatus(state,text){ statusEl.setAttribute('data-live',state); frame.setAttribute('data-live',state); toggle.setAttribute('data-live',state); statusText.textContent=text; }
+  function mark(){ if(!painted){ painted=true; hint.classList.add('gone'); } }
+  function autoCorrelate(buf,sr){
+    var SIZE=buf.length, rms=0; for(var i=0;i<SIZE;i++){ rms+=buf[i]*buf[i]; } rms=Math.sqrt(rms/SIZE);
+    if(rms<0.01) return {freq:-1,clarity:0};
+    var r1=0,r2=SIZE-1,th=0.2; for(var a=0;a<SIZE/2;a++){ if(Math.abs(buf[a])<th){ r1=a; break; } } for(var b=1;b<SIZE/2;b++){ if(Math.abs(buf[SIZE-b])<th){ r2=SIZE-b; break; } }
+    var n=r2-r1; if(n<64) return {freq:-1,clarity:0};
+    var maxLag=Math.min(n-1, Math.floor(sr/70)), c=new Float32Array(maxLag), c0=0;
+    for(var e=0;e<n;e++){ var vv=buf[r1+e]; c0+=vv*vv; }
+    for(var lag=0;lag<maxLag;lag++){ var s=0; for(var f=0;f<n-lag;f++){ s+=buf[r1+f]*buf[r1+f+lag]; } c[lag]=s; }
+    var d=0; while(d<maxLag-1 && c[d]>c[d+1]) d++; var mv=-1,mp=-1; for(var g=d;g<maxLag;g++){ if(c[g]>mv){ mv=c[g]; mp=g; } }
+    if(mp<=0) return {freq:-1,clarity:0}; var x1=c[mp-1]||0,x2=c[mp],x3=c[mp+1]||0, aa=(x1+x3-2*x2)/2, bb=(x3-x1)/2, T=mp; if(aa) T=mp-bb/(2*aa);
+    return {freq: sr/T, clarity: c0>0? mv/c0 : 0};
+  }
+  function midiFromFreq(f){ return 69+12*Math.log(f/440)/Math.log(2); }
+  function analyze(now){
+    analyser.getFloatTimeDomainData(timeF); analyser.getByteFrequencyData(freqData);
+    var sum=0; for(var i=0;i<timeF.length;i++){ sum+=timeF[i]*timeF[i]; } var rms=Math.sqrt(sum/timeF.length);
+    var flux=0, cNum=0, cDen=0; for(var bi=0;bi<freqData.length;bi++){ var m=freqData[bi]/255; var diff=m-prevSpec[bi]; if(diff>0) flux+=diff; prevSpec[bi]=m; cNum+=bi*m; cDen+=m; }
+    var meanFlux=fluxSum/fluxHist.length; fluxSum-=fluxHist[fluxIdx]; fluxHist[fluxIdx]=flux; fluxSum+=flux; fluxIdx=(fluxIdx+1)%fluxHist.length;
+    var isOnset = flux>meanFlux*1.6+0.35 && flux>prevFlux && (now-lastOnset)>110; prevFlux=flux;
+    var nyquist=(audioCtx?audioCtx.sampleRate:44100)/2, centroidHz=cDen>0?(cNum/cDen)/freqData.length*nyquist:0;
+    if(frameN%2===0) lastPitch = rms>0.012 ? autoCorrelate(timeF, audioCtx?audioCtx.sampleRate:44100) : {freq:-1,clarity:0};
+    var pitched = lastPitch.freq>0 && lastPitch.freq<3000 && lastPitch.clarity>0.5;
+    if(pitched) curTone=((midiFromFreq(lastPitch.freq)%12)+12)%12/12; else curTone=clamp((Math.log(Math.max(centroidHz,1))-Math.log(120))/(Math.log(4500)-Math.log(120)),0,1);
+    dispLevel+=(rms-dispLevel)*0.3; lvlEl.style.width=Math.min(100,dispLevel*260)+'%';
+    var thr=sensThreshold();
+    if(rms>thr){
+      if(pitched){ var mi=Math.round(midiFromFreq(lastPitch.freq)); noteOut.innerHTML='<b>'+NOTE_NAMES[((mi%12)+12)%12]+(Math.floor(mi/12)-1)+'</b>'; } else noteOut.innerHTML='<span class="mk">flow</span>';
+      var norm=clamp((rms-thr)/(0.42-thr),0,1);
+      var intensity=clamp(norm*0.85 + (isOnset?0.3:0), 0, 1);
+      var gap= isOnset?140: lerp(360,180,norm);
+      if(now-lastRelease>gap){
+        var midi = pitched ? Math.round(midiFromFreq(lastPitch.freq)) : -99;
+        var combined = pitched && lastRelMidi>-90 && Math.abs(midi-lastRelMidi)<=2 && (now-lastRelTime)<1400 && (now-lastRelTime)>150;
+        var formRoll=Math.random(), formed=false;
+        if(formRoll<0.07 && curFill>0.08){ var bk=BIGFORMS[Math.random()*BIGFORMS.length|0]; spawnBigForm(bk,intensity,curTone); noteOut.innerHTML+=' <span class="mk">· '+bk+'</span>'; formed=true; }  // ink gathers into a foreground form
+        else if(intensity>0.6 && formRoll<0.22){ spawnFormer('building',intensity,curTone); noteOut.innerHTML+=' <span class="mk">· building</span>'; formed=true; }   // larger sounds -> vague buildings
+        else if(formRoll<0.13){ var fk=['figure','mountain','ocean'][Math.random()*3|0]; spawnFormer(fk,intensity,curTone); noteOut.innerHTML+=' <span class="mk">· '+fk+'</span>'; formed=true; }
+        if(!formed){
+          var kind;
+          if(combined) kind='shape';                                          // a related note soon after another -> a shape
+          else if(isOnset && (!pitched || lastPitch.clarity<0.55) && norm>0.28) kind='splat';   // percussive / noisy -> splat
+          else if(pitched && centroidHz>1350) kind='racer';                    // bright, high tones -> racing line
+          else kind='plume';                                                   // otherwise a plume that spreads and sticks
+          if(kind==='shape'){ var p=pickPoint(); injectShape(p.x,p.y,curTone, SHAPES[((midi%SHAPES.length)+SHAPES.length)%SHAPES.length], lerp(9,26,intensity)); noteOut.innerHTML+=' <span class="mk">· shape</span>'; }
+          else if(kind==='splat'){ var q=pickPoint(); injectSplat(q.x,q.y,curTone,intensity); noteOut.innerHTML+=' <span class="mk">· splat</span>'; }
+          else if(kind==='racer'){ spawnRacer(curTone,intensity); noteOut.innerHTML+=' <span class="mk">· line</span>'; }
+          else { injectInk(intensity, curTone); }
+        }
+        lastRelease=now; if(isOnset) lastOnset=now; if(pitched){ lastRelMidi=midi; lastRelTime=now; }
+      }
+    } else noteOut.textContent='—';
+  }
+
+  // ---------- main loop (always simulating) ----------
+  var lastFrame=performance.now(), acc=0, zoomTick=0, curFill=0, FILL_THRESH=0.52, ZOOM_SPEED=1.4;
+  function loop(ts){
+    requestAnimationFrame(loop); frameN++;
+    var now=ts||performance.now(), dt=Math.min(0.05,(now-lastFrame)/1000); lastFrame=now;
+    FADE_NOW = running && (now-lastRelease < 1600);   // sediment only fades while sound is being played; a finished painting holds
+    if(running && analyser) analyze(now);
+    advancePalette(dt);
+    // fixed-step fluid for stability (up to 2 substeps)
+    acc+=dt; var steps=0; var h=1/60;
+    while(acc>=h && steps<2){ stepFluid(reduce?h*0.5:h); acc-=h; steps++; }
+    if(steps===0){ stepFluid(Math.max(0.008,dt)); acc=0; }
+    updateRacers(dt); updateFormers(dt);
+    // tank full -> slowly zoom out so more clear water opens above the sediment
+    zoomTick+=dt; if(zoomTick>0.12){ zoomTick=0; curFill=fillLevel(); }
+    if(curFill>FILL_THRESH){ var zk=1-((curFill-FILL_THRESH)*ZOOM_SPEED)*dt; if(zk<0.9865)zk=0.9865; zoomFields(zk); }
+    render();
+    if(!painted){ hintTimer+=dt; if(hintTimer>6){ painted=true; hint.classList.add('gone'); } }
+  }
+
+  // ---------- controls / mic ----------
+  function start(){
+    if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){ showError("This browser won't share a microphone. Try Chrome, Safari, or Firefox in a normal tab."); return; }
+    toggle.disabled=true; statusText.textContent='Opening mic…';
+    navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}})
+    .then(function(s){ stream=s; audioCtx=new (window.AudioContext||window.webkitAudioContext)(); if(audioCtx.state==='suspended')audioCtx.resume();
+      var src=audioCtx.createMediaStreamSource(stream); analyser=audioCtx.createAnalyser(); analyser.fftSize=2048; analyser.smoothingTimeConstant=0.72; src.connect(analyser);
+      freqData=new Uint8Array(analyser.frequencyBinCount); timeF=new Float32Array(analyser.fftSize); prevSpec=new Float32Array(analyser.frequencyBinCount);
+      running=true; toggle.disabled=false; toggle.textContent='Stop listening'; note.classList.remove('err');
+      note.textContent='Listening. Quiet sounds drop a thin tendril of ink; louder sounds release a heavy, folding plume.'; setStatus('on','Listening'); mark();
+    })
+    .catch(function(err){ toggle.disabled=false;
+      if(err&&(err.name==='NotAllowedError'||err.name==='SecurityError')) showError("No microphone access. Allow it for this page, then begin again. If this is running inside a preview frame, open it in its own browser tab.");
+      else if(err&&err.name==='NotFoundError') showError("No microphone found on this device.");
+      else showError("Couldn't start the microphone"+(err&&err.message?(": "+err.message):"."));
+    });
+  }
+  function stop(){ running=false; if(stream){ stream.getTracks().forEach(function(t){t.stop();}); stream=null; } if(audioCtx){ audioCtx.close(); audioCtx=null; } analyser=null;
+    toggle.textContent='Begin listening'; setStatus('off','Idle'); lvlEl.style.width='0%'; noteOut.textContent='—'; }
+  function showError(msg){ setStatus('off','Idle'); toggle.textContent='Begin listening'; note.classList.add('err'); note.textContent=msg; }
+
+  toggle.addEventListener('click',function(){ if(running) stop(); else start(); });
+  clearBtn.addEventListener('click', clearWater);
+  saveBtn.addEventListener('click',function(){ var a=document.createElement('a'); a.download='sound-seen-'+Date.now()+'.png'; a.href=paper.toDataURL('image/png'); a.click(); });
+  function setMode(t){ turbulent=t; mScatter.setAttribute('aria-pressed',(!t).toString()); mCompose.setAttribute('aria-pressed',t.toString()); }
+  mScatter.addEventListener('click',function(){ setMode(false); });
+  mCompose.addEventListener('click',function(){ setMode(true); });
+
+  // ---------- init ----------
+  resize();
+  var rt; if(window.ResizeObserver){ new ResizeObserver(function(){ clearTimeout(rt); rt=setTimeout(resize,180); }).observe(frame); }
+  else window.addEventListener('resize',function(){ clearTimeout(rt); rt=setTimeout(resize,180); });
+  window.addEventListener('beforeunload',function(){ if(stream){ stream.getTracks().forEach(function(t){t.stop();}); } });
+  // starts as clear water; paints only in response to sound
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
