@@ -526,7 +526,7 @@
       var src=audioCtx.createMediaStreamSource(stream); analyser=audioCtx.createAnalyser(); analyser.fftSize=2048; analyser.smoothingTimeConstant=0.72; src.connect(analyser);
       freqData=new Uint8Array(analyser.frequencyBinCount); timeF=new Float32Array(analyser.fftSize); prevSpec=new Float32Array(analyser.frequencyBinCount);
       running=true; toggle.disabled=false; toggle.textContent='Stop listening'; note.classList.remove('err');
-      note.textContent='Listening. Quiet sounds drop a thin tendril of ink; louder sounds release a heavy, folding plume.'; setStatus('on','Listening'); mark();
+      note.textContent=''; setStatus('on','Listening'); mark();
     })
     .catch(function(err){ toggle.disabled=false;
       if(err&&(err.name==='NotAllowedError'||err.name==='SecurityError')) showError("No microphone access. Allow it for this page, then begin again. If this is running inside a preview frame, open it in its own browser tab.");
